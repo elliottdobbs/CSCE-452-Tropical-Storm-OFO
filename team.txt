@@ -1,0 +1,7 @@
+Team "Tropical Storm OFO"
+Website: elliottdobbs.github.io/CSCE-452-Tropical-Storm-OFO/index.html
+Gabriel Stella 126005735
+Noe Balli 824003915
+Kyle DeGonge 324001408
+Elliott Dobbs 823004322
+Jonathan Beechner 126003922

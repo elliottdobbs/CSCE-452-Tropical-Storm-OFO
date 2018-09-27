@@ -202,23 +202,27 @@ function drawArc(level, angleFrom, angleTo) {
   ctxP.save();
   ctxP.translate(canvas.width / 2, canvas.height / 2);
 
-  var offset = 0;
-  for(var i = 0; i < level; i++) {
-    offset += robot.getAxisRotation(i);
-  }
-  angleFrom += offset;
-  angleTo += offset;
-
   ctxP.beginPath();
   var p = robot.getAxisBeginPoint(level);
   var radius = robot.getEndPoint().copy();
   radius.translate(p.negative());
   radius = radius.magnitude();
+
+  //swap now to prevent issues later
   if(angleFrom > angleTo) {
     var tmp = angleTo;
     angleTo = angleFrom;
     angleFrom = tmp;
   }
+  //fix angles
+  var p1 = robot.getEndPoint().copy();
+  var p2 = robot.getEndPoint().copy();
+  var a = robot.getAxisRotation(level);
+  p1.rotateAround(p, angleFrom - a);
+  p2.rotateAround(p, angleTo - a);
+  angleFrom = p1.angleAround(p);
+  angleTo = p2.angleAround(p);
+
   ctxP.arc(p.x, p.y, radius, angleFrom, angleTo);
   ctxP.strokeStyle = Options.PaintColor;
   ctxP.lineWidth = Options.PaintRadius * 2;

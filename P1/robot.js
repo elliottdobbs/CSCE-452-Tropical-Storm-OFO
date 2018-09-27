@@ -43,6 +43,13 @@ class Point {
     return Math.atan2(this.y, this.x);
   }
 
+  angleAround(p) {
+    this.translate(p.negative());
+    var ret = this.angle();
+    this.translate(p);
+    return ret;
+  }
+
   rotate(dr) {
     var cos = Math.cos(dr);
     var sin = Math.sin(dr);
