@@ -66,30 +66,120 @@ class Point {
   }
 }
 
+function transformRotationMatrix(angle) {
+  var c = Math.cos(angle);
+  var s = Math.sin(angle);
+  return math.matrix([
+    [c, -s, 0],
+    [s, c, 0],
+    [0, 0, 1]
+  ]);
+}
+
+//accepts single point or two numbers
+function transformTranslationMatrix(x, y) {
+  var dx = 0, dy = 0;
+  if(y != undefined) {
+    //x and y are numbers
+    dx = x;
+    dy = y;
+  } else {
+    //x is actually a point, y undefined
+    dx = x.x;
+    dy = x.y;
+  }
+  return math.matrix([
+    [1, 0, dx],
+    [0, 1, dy],
+    [0, 0, 1]
+  ]);
+}
+
+class Transform {
+  constructor(matrix) {
+    this.matrix = matrix || math.identity(3);
+  }
+
+  rotate(angle) {
+    var rotation = transformRotationMatrix(angle)
+    this.matrix = math.multiply(this.matrix, rotation);
+  }
+
+  //accepts single point or two numbers
+  translate(x, y) {
+    var translation = transformTranslationMatrix(x, y);
+    this.matrix = math.multiply(this.matrix, translation);
+  }
+
+  frame(angle, x, y) {
+    this.translate(x, y);
+    this.rotate(angle);
+  }
+
+  multiply(t) {
+    return new Transform(math.multiply(this.matrix, t.matrix));
+  }
+
+  inverse() {
+    this.matrix = math.inv(this.matrix);
+  }
+
+  apply(p) {
+    var pAsMatrix = math.matrix([[p.x], [p.y], [1]]);
+    var result = math.multiply(this.matrix, pAsMatrix);
+    return new Point(result._data[0][0], result._data[1][0]);
+  }
+}
+
 class Robot {
 
   //tell the robot how many axes it will have
-  constructor(axes) {
-    this.angles = [];
+  constructor() {
+    this.axes = 0;
     this.lengths = [];
-    this.lengths_total = [];
-    this.lengths_total.push(0);
-    this.points = [];
-    this.points.push(new Point(0, 0));
+    this.angles = [];
     this.colors = [];
-    this.axes = axes;
-    for(var i = 0; i < axes; i++) {
-      this.angles.push(0);
-      this.lengths.push(1);
-      this.lengths_total.push(0);
-      this.points.push(new Point(i + 1, 0));
-      this.colors.push("#ff0000");
-    }
+    this.transforms = [];
   }
 
   //indices start at 0
   //angles in radians
   //lengths in pixels
+
+  addAxis(length, angle, color) {
+    length = length || 100;
+    angle = angle || 0;
+    color = color || "#ff0000";
+
+    var index = this.axes;
+    this.axes++;
+    this.lengths.push(length);
+    this.angles.push(angle);
+    this.colors.push(color);
+    this.transforms.push(this.getTransform(angle, length));
+    return index;
+  }
+
+  getTransform(angle, length) {
+    var t = new Transform();
+    t.rotate(angle);
+    t.translate(length, 0);
+    return t;
+  }
+
+  getT(index) {
+    return this.transforms[index];
+  }
+
+  getTRange(from, to) {
+    from = from || 0;
+    if(to == undefined) to = this.axes;
+    var t = new Transform();
+    for(var i = from; i < to; i++) {
+      t = t.multiply(this.transforms[i]);
+    }
+    return t;
+  }
 
   //dangle = delta angle...
   rotateAxis(index, dangle) {
@@ -101,11 +191,8 @@ class Robot {
   }
 
   setAxisRotation(index, angle) {
-    var deltaAngle = angle - this.angles[index];
     this.angles[index] = angle;
-    for(var i = index + 1; i <= this.axes; i++) {
-      this.points[i].rotateAround(this.points[index], deltaAngle);
-    }
+    this.transforms[index] = this.getTransform(angle, this.lengths[index]);
   }
 
   getAxisLength(index) {
@@ -113,31 +200,20 @@ class Robot {
   }
 
   setAxisLength(index, length) {
-    if(length == 0) return;
-
-    var deltaMagnitude = length / this.lengths[index];
     this.lengths[index] = length;
-
-    var source = this.points[index];
-    var delta = this.points[index + 1].copy();
-    delta.scaleAround(source, deltaMagnitude);
-    delta.translate(this.points[index + 1].negative());
-
-    for(var i = index + 1; i <= this.axes; i++) {
-      this.points[i].translate(delta);
-    }
-
-    for(var i = index; i <= this.axes; i++) {
-      this.lengths_total[i + 1] = this.lengths_total[i] + this.lengths[i];
-    }
+    this.transforms[index] = this.getTransform(this.angles[index], length);
   }
 
   getAxisBeginPoint(index) {
-    return this.points[index];
+    var p = new Point();
+    var t = this.getTRange(0, index);
+    return t.apply(p);
   }
 
   getAxisEndPoint(index) {
-    return this.points[index + 1];
+    var p = new Point();
+    var t = this.getTRange(0, index + 1);
+    return t.apply(p);
   }
 
   getEndPoint() {
@@ -146,9 +222,11 @@ class Robot {
 
   draw(ctx) {
     ctx.lineWidth = 2;
+console.log("DRAW");
     for(var i = 0; i < this.axes; i++) {
       var start = this.getAxisBeginPoint(i);
       var end = this.getAxisEndPoint(i);
+console.log(JSON.stringify(start) + " " + JSON.stringify(end));
 
       ctx.strokeStyle = this.colors[i];
       ctx.beginPath();

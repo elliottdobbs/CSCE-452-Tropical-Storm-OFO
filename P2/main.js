@@ -96,14 +96,10 @@ function start() {
   f1.add(Options, "Clear");
   f1.add(Options, "Dot");
 
-  robot = new Robot(3);
-  robot.setAxisLength(0, 150);
-  robot.setAxisLength(1, 100);
-  robot.setAxisLength(2, 75);
-  robot.setAxisRotation(0, -Math.PI / 2);
-  robot.colors[0] = "#ff0000";
-  robot.colors[1] = "#00ff00";
-  robot.colors[2] = "#0000ff";
+  robot = new Robot();
+  robot.addAxis(150, -Math.PI / 2, "#ff0000");
+  robot.addAxis(100, 0, "#00ff00");
+  robot.addAxis(75, 0, "#0000ff");
 
   //for each axis
   for(var i = 0; i < 3; i++) {
