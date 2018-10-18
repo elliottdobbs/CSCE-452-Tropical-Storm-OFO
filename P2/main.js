@@ -1,4 +1,18 @@
-//trololo
+//TODO:
+//fix issue where robot misses some configurations :T
+
+//dat.gui polyfill courtesy of: https://stackoverflow.com/a/15851156
+dat.GUI.prototype.removeFolder = function(name) {
+  var folder = this.__folders[name];
+  if (!folder) {
+    return;
+  }
+  folder.close();
+  this.__ul.removeChild(folder.domElement.parentNode);
+  delete this.__folders[name];
+  this.onResize();
+}
+
 console.log('Initializing robot');
 
 //Grab the HTML5 canvas reference from the html DOM
@@ -22,6 +36,30 @@ var PREV_WINDOW_HEIGHT = 0;
 //used to keep track of system timing (in milliseconds)
 var FIRST_TICK_MS = new Date().getTime();
 var PREV_TICK_MS = FIRST_TICK_MS;
+
+//mouse input
+//http://www.html5canvastutorials.com/advanced/html5-canvas-mouse-coordinates/
+var THE_MOUSE = new Point();
+var THE_MOUSE_DOWN = false;
+
+function getMousePos(evt) {
+  var rect = canvas.getBoundingClientRect();
+  var p = new Point(evt.clientX - rect.left, evt.clientY - rect.top);
+  p.translate(-canvas.width / 2, -canvas.height / 2);
+  return p;
+}
+canvas.addEventListener('mousemove', function(evt) {
+  var mousePos = getMousePos(evt);
+  THE_MOUSE = mousePos;
+}, false);
+canvas.addEventListener('mousedown', function(evt) {
+  THE_MOUSE_DOWN = true;
+}, false);
+canvas.addEventListener('mouseup', function(evt) {
+  THE_MOUSE_DOWN = false;
+}, false);
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 function update() {
 
@@ -63,98 +101,45 @@ function update() {
   requestAnimationFrame(update);
 }
 
+var robot = null;
+
 var Options = {
-  Angle: 5,
-  Drawing: false,
   ShowRobot: true,
   Background: "#000000",
-  PaintColor: "#ffffff",
-  PaintRadius: 5,
   Clear: function() {
     ctxP.clearRect(0, 0, canvas.width, canvas.height);
   },
-  Dot: function() {
-    drawDot(robot.getEndPoint());
+  ArmLength: 50,
+  ArmColor: "#c0c0c0",
+  AddArm: function() {
+    robot.addAxis(this.ArmLength, 0, this.ArmColor, this.gui);
+  },
+  RemoveArm: function() {
+    robot.removeAxis(this.gui);
   }
 };
-
-var robot = null;
 
 //initialize everything
 function start() {
 
   //TODO: configure other HTML or dat.gui things
   var gui = new dat.GUI();
+  Options.gui = gui;
 
   var f1 = gui.addFolder("Options");
-  f1.add(Options, "Angle", 0, 90);
-  f1.add(Options, "Drawing");
   f1.add(Options, "ShowRobot");
   f1.addColor(Options, "Background");
-  f1.addColor(Options, "PaintColor");
-  f1.add(Options, "PaintRadius", 1, 20);
   f1.add(Options, "Clear");
-  f1.add(Options, "Dot");
+  f1.add(Options, "ArmLength", 1, 200);
+  f1.addColor(Options, "ArmColor");
+  f1.add(Options, "AddArm");
+  f1.add(Options, "RemoveArm");
 
   robot = new Robot();
-  robot.addAxis(150, -Math.PI / 2, "#ff0000");
-  robot.addAxis(100, 0, "#00ff00");
-  robot.addAxis(75, 0, "#0000ff");
-
-  //for each axis
-  for(var i = 0; i < 3; i++) {
-    var folder = gui.addFolder("Axis " + (i + 1));
-    var obj = {
-      "level": i,
-      "RotateCW": function(){
-        var from = robot.getAxisRotation(this.level);
-        var incr = Options.Angle * Math.PI / 180;
-        if(Options.Drawing) drawArc(this.level, from, from + incr);
-        robot.rotateAxis(this.level, incr);
-      },
-      "RotateCCW": function(){
-        var from = robot.getAxisRotation(this.level);
-        var incr = -Options.Angle * Math.PI / 180;
-        if(Options.Drawing) drawArc(this.level, from, from + incr);
-        robot.rotateAxis(this.level, incr);
-      },
-      get Color() {
-        return robot.colors[this.level];
-      },
-      set Color(color) {
-        robot.colors[this.level] = color;
-      },
-      get Length() {
-        return robot.getAxisLength(this.level);
-      },
-      set Length(length) {
-        robot.setAxisLength(this.level, length);
-      },
-      get Angle() {
-        var angle = robot.getAxisRotation(this.level) * 180.0 / Math.PI;
-        while(angle < -180) {
-          angle += 360;
-        }
-        while(angle > 180) {
-          angle -= 360;
-        }
-        return angle;
-      },
-      set Angle(angle) {
-        var to = angle * Math.PI / 180.0;
-        if(Options.Drawing) drawArc(this.level, robot.getAxisRotation(this.level), to);
-        robot.setAxisRotation(this.level, to)
-      }
-    };
-    folder.add(obj, "RotateCW");
-    folder.add(obj, "RotateCCW");
-    folder.addColor(obj, "Color");
-    folder.add(obj, "Length", 1, 200);
-    folder.add(obj, "Angle", -180, 180).listen();
-
-    //TODO color changing for each axis
-    //gui.addColor(Options, "color");
-  }
+  robot.addOptions(gui.addFolder("Painting"));
+  robot.addAxis(150, -Math.PI / 2, "#ff0000", gui);
+  robot.addAxis(100, 0, "#00ff00", gui);
+  robot.addAxis(75, 0, "#0000ff", gui);
 
   //initial call to the update function to get things going
   update();
@@ -184,67 +169,8 @@ function updateAndRender(width, height, ctx, deltaTime, totalTime) {
     ctx.fill();
     ctx.closePath();
 
-    robot.draw(ctx);
+    robot.draw(ctx, THE_MOUSE);
   }
 
-/*
-  if(Options.Drawing) {
-    drawDot(robot.getEndPoint());
-  }
-*/
-}
-
-function drawArc(level, angleFrom, angleTo) {
-  ctxP.save();
-  ctxP.translate(canvas.width / 2, canvas.height / 2);
-
-  ctxP.beginPath();
-  var p = robot.getAxisBeginPoint(level);
-  var radius = robot.getEndPoint().copy();
-  radius.translate(p.negative());
-  radius = radius.magnitude();
-
-  //swap now to prevent issues later
-  if(angleFrom > angleTo) {
-    var tmp = angleTo;
-    angleTo = angleFrom;
-    angleFrom = tmp;
-  }
-  //fix angles
-  var p1 = robot.getEndPoint().copy();
-  var p2 = robot.getEndPoint().copy();
-  var a = robot.getAxisRotation(level);
-  p1.rotateAround(p, angleFrom - a);
-  p2.rotateAround(p, angleTo - a);
-  angleFrom = p1.angleAround(p);
-  angleTo = p2.angleAround(p);
-
-  ctxP.arc(p.x, p.y, radius, angleFrom, angleTo);
-  ctxP.strokeStyle = Options.PaintColor;
-  ctxP.lineWidth = Options.PaintRadius * 2;
-  ctxP.stroke();
-  ctxP.closePath();
-
-  ctxP.restore();
-
-  var p2 = p.copy();
-  p2.translate(radius, 0);
-  p2.rotateAround(p, angleFrom);
-  drawDot(p2);
-  p2.rotateAround(p, angleTo - angleFrom);
-  drawDot(p2);
-}
-
-function drawDot(p) {
-  //put a paint dot on ctxP
-  ctxP.save();
-  ctxP.translate(canvas.width / 2, canvas.height / 2);
-
-  ctxP.beginPath();
-  ctxP.arc(p.x, p.y, Options.PaintRadius, 0,2*Math.PI);
-  ctxP.fillStyle = Options.PaintColor;
-  ctxP.fill();
-  ctxP.closePath();
-
-  ctxP.restore();
+  robot.update(ctxP, THE_MOUSE, THE_MOUSE_DOWN);
 }
