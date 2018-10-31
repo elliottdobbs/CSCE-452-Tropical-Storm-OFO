@@ -16,6 +16,10 @@ var Angles = {
   }
 };
 
+function lawOfCosines(opposite, s1, s2) {
+  return (-(opposite * opposite) + s1 * s1 + s2 * s2) / (2 * s1 * s2);
+}
+
 class Point {
   constructor(x, y) {
     this.x = x || 0;
@@ -300,6 +304,38 @@ class Robot {
       p.scale(len / m);
     }
 
+    this.fixReach(p);
+
+    //make sure it's working
+    //this prevents it from missing some points due to configuration issues
+    var threshold = 0.001;
+    if(p.distance(this.getEndPoint()) > threshold) {
+      for(var axis = this.axes - 2; axis >= 0; axis--) {
+        var stop = this.getEndPoint();
+        var start = this.getAxisBeginPoint(axis);
+        var end = this.getAxisEndPoint(axis);
+        var opp = end.distance(stop);
+        var s1 = start.distance(p);
+        var s2 = this.lengths[axis];
+        var cos_angle = lawOfCosines(opp, s1, s2);
+        if(Math.abs(cos_angle) <= 1) {
+          var alpha = p.angleAround(start);
+          var beta = end.angleAround(start);
+          var angle = Math.acos(cos_angle);
+          if(Angles.less(alpha, beta)) {
+            this.setAxisRotation(axis, (alpha + angle));
+          } else {
+            this.setAxisRotation(axis, (alpha - angle));
+          }
+          //fix the upper arms (should only need very slight modification)
+          this.fixReach(p);
+          break;
+        }
+      }
+    }
+  }
+
+  fixReach(p) {
     var reach = [];
     for(var i = 0; i < this.axes; i++) {
       reach.push(this.lengths[i]);
@@ -329,7 +365,7 @@ class Robot {
         var dist2 = p.distance(start);
         delta.scale(dist2 / delta.magnitude());
         var extra = delta.magnitude() - delta_d;
-        var cos_dmod = (0 - (next_reach * next_reach) + (delta_d * delta_d) + (dist2 * dist2)) / (2 * delta_d * dist2);
+        var cos_dmod = lawOfCosines(next_reach, delta_d, dist2);
         if(Math.abs(cos_dmod) <= 1) {
           dist -= Math.acos(cos_dmod);
         }
@@ -341,8 +377,6 @@ class Robot {
         }
       }
     }
-
-    //move the last arm into position
   }
 
   getAxisBeginPoint(index) {
