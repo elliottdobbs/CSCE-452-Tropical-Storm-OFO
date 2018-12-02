@@ -17,6 +17,7 @@ class MotionPlanner {
   }
 
   update(field, start, end, boxes) {
+console.log("Updating motion planner...");
 
     //preparing stuff
     var cells_per_side = boxes.length * 2 + 1;
@@ -81,6 +82,7 @@ class MotionPlanner {
     if(cell_start < 0 || cell_end < 0) {
       this.path = [];
       this.path_points = [];
+console.log("  No path found: starting or ending point inaccessible");
       return;
     }
 
@@ -109,6 +111,7 @@ class MotionPlanner {
     if(sources[cell_start] == undefined) {
       this.path = [];
       this.path_points = [];
+console.log("  No path found: route blocked by obstacles");
       return;
     }
 
@@ -123,6 +126,7 @@ class MotionPlanner {
     path_points.push(end);
     this.path = path;
     this.path_points = path_points;
+console.log("  Path found: route contains " + path.length + " cells");
   }
 
   render(ctx, field) {

@@ -151,7 +151,9 @@ class Simulation {
     ctx.strokeStyle = "#ffffff";
     ctx.fillStyle = "#ff0000";
 
+    if(this.mp.path.length == 0) ctx.strokeStyle = "#ff0000"; //alert that there is no path
     RenderHelper.drawRectangle(ctx, this.field);
+    //ctx.strokeStyle = "#ffffff";
 
     ctx.save();
     RenderHelper.clip(ctx, this.field.point, this.field.width, this.field.height);
